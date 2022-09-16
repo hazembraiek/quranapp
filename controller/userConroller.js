@@ -1,17 +1,19 @@
-const User = require("../model/userModel");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/appError");
 const jwt = require("jsonwebtoken");
+const userRepository = require("./../repository/user.repository");
+const { promisify } = require("util");
 
 const sendAndCreateToken = (res, statusCode, user) => {
   let token = asignToken(user._id);
-  const cookiOption = {
+  const cookieOption = {
     expires: new Date(
       Date.now() + process.env.JWT_COOKIE_EXPIRES * 24 * 60 * 60 * 1000
     ),
+    httpOnly: true,
   };
-  res.cookie("jwt", token, cookiOption);
-  console.log(token);
+  res.cookie("jwt", token, cookieOption);
+
   res.status(statusCode).json({
     status: "success",
     token,
@@ -28,16 +30,16 @@ const asignToken = (id) => {
 };
 
 exports.signup = catchAsync(async (req, res, next) => {
-  let newUser = await User.create(req.body);
+  let newUser = await userRepository.createUser(req.body);
   sendAndCreateToken(res, 201, newUser);
 });
 
 exports.login = catchAsync(async (req, res, next) => {
+  console.log(req.body);
   let { email, password } = req.body;
-  console.log(email);
   if (!email || !password)
     return next(new AppError("please provite an email", 400));
-  let user = await User.findOne({ email }).select("+password");
+  let user = await userRepository.getOne({ email });
   if (
     !user ||
     (!(await user.corectpassword(password, user.password)) &&
@@ -55,16 +57,15 @@ exports.protect = catchAsync(async (req, res, next) => {
     req.headers.authorization.startsWith("Bearer")
   ) {
     token = req.headers.authorization.split(" ")[1];
-  } else if (req.cookies.jwt) {
-    token = req.cookies.jwt;
   }
 
   if (!token) {
     return next(new AppError("you not logged in !!", 401));
   }
+
   let decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
-  console.log(decoded);
-  let CurrentUser = await User.findById(decoded.id);
+
+  let CurrentUser = await userRepository.getOne({ _id: decoded.id });
 
   if (!CurrentUser)
     return next(new AppError("the user is not defined at this token !!!", 401));
@@ -83,7 +84,7 @@ exports.isLoggedIn = catchAsync(async (req, res, next) => {
       process.env.JWT_SECRET
     );
 
-    let CurrentUser = await User.findById(decoded.id);
+    let CurrentUser = await userRepository.getOne({ _id: decoded.id });
 
     if (!CurrentUser) return next();
 
@@ -103,15 +104,35 @@ exports.restricteTo = (...roles) => {
   };
 };
 
-exports.updatePassword = async (req, res, next) => {
-  const id = req.user.id;
-  const user = await User.findById(id).select("+password");
-  if (!(await user.corectpassword(req.body.CurrentPassword, user.password)))
-    return next(new AppError("Your current passwod is wrong!", 401));
+// exports.updatePassword = async (req, res, next) => {
+//   const id = req.user.id;
+//   const user = await User.findById(id).select("+password");
+//   if (!(await user.corectpassword(req.body.CurrentPassword, user.password)))
+//     return next(new AppError("Your current passwod is wrong!", 401));
 
-  user.password = req.body.password;
-  user.conformPassword = req.body.conformPassword;
-  await user.save();
+//   user.password = req.body.password;
+//   user.conformPassword = req.body.conformPassword;
+//   await user.save();
 
-  sendAndCreateToken(res, 200, user);
-};
+//   sendAndCreateToken(res, 200, user);
+// };
+
+exports.getUser = catchAsync(async (req, res, next) => {
+  const id = req.params.id;
+  const user = await userRepository.getUserById(id);
+
+  if (!user) {
+    return next(new AppError(`No user found with that Id`, 404));
+  }
+  res.status(200).json({
+    status: "success",
+    data: {
+      user,
+    },
+  });
+});
+
+exports.getMe = catchAsync(async (req, res, next) => {
+  req.params.id = req.user.id;
+  next();
+});

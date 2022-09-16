@@ -3,13 +3,8 @@ const SaveData = require("./../utils/saveData");
 const fs = require("fs");
 const AppError = require("../utils/appError");
 const { default: axios } = require("axios");
-const QuranModel = require("../model/quranModel");
-
-const getSurah = (nbAyah, Quran) => {
-  const { name, englishName, revelationType, number, englishNameTranslation } =
-    Quran.find((surah) => surah.ayahs.find((ayah) => ayah.number === nbAyah));
-  return { number, name, englishName, revelationType, englishNameTranslation };
-};
+const quranRepository = require("./../repository/quran.reqository");
+const historyRepository = require("./../repository/history.repository");
 
 const FilterData = ({ data }) => {
   const ValuesNumbers = Object.keys(data.surahs);
@@ -20,31 +15,38 @@ const FilterData = ({ data }) => {
 };
 
 exports.GetQuran = catchAsync(async (req, res, next) => {
-  const Quran = await QuranModel.find();
-  const { surah, page } = req.query;
-  if (surah > Quran.length || surah < 1) {
+  const userID = req.user._id;
+  const { surah, page, search } = req.query;
+  if (surah > 114 || surah < 1) {
     return next(new AppError("surah not Found", 400));
   }
   if (page < 1) {
     return next(new AppError("Pgae not Found", 400));
   }
-  let Surahs = Quran;
-  if (page && !surah) {
-    Surahs = Surahs.flatMap((surah) => surah.ayahs).filter(
-      (ayah) => ayah.page == page
-    );
-  } else if (surah) {
-    Surahs = Quran[surah - 1];
-    const firstPage = Quran[surah - 1].ayahs[0].page - 1 + (+page || 1);
-    Surahs = Surahs.ayahs.filter((ayah) => ayah.page === firstPage);
-    if (Surahs.length === 0)
-      return next(new AppError("this surah has no " + page + " page", 404));
+  let filterData = {};
+
+  if (surah) {
+    filterData.number = surah;
+  } else if (page) {
+    filterData.page = page;
+  } else if (search) {
+    filterData = { ...filterData, englishName: { $regex: search } };
   }
-  const Surah = getSurah(Surahs[0].number, Quran);
+
+  let data = !page ? await quranRepository.getSurahs(filterData) : null;
+
+  if (surah && data) {
+    data = data[0].toObject();
+    const ayahs = await quranRepository.getAyahsBySurah(data._id);
+    data.ayahs = ayahs;
+    await historyRepository.createHistory(data._id, 1, userID);
+  } else if (page) {
+    data = await quranRepository.getAyahsByPage(page);
+  }
+
   res.status(200).json({
     status: "success",
-    numberAyahs: surah || page ? Surahs.length : 6236,
-    data: !surah && !page ? { Quran: Surahs } : { Surah, Quran: Surahs },
+    data,
   });
 });
 

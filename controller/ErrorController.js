@@ -6,9 +6,9 @@ const sendErrorDev = (err, req, res) => {
       message: err.message,
     });
   } else {
-    res.status(err.statusCode).render("error", {
+    res.status(err.statusCode).json({
       title: `Somthing went very wrong!`,
-      msg: err.message,
+      message: err.message,
     });
   }
 };
