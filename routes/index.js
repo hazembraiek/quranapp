@@ -2,7 +2,6 @@ const express = require("express");
 const quranRoute = require("./quranRoute");
 const userRoute = require("./userRoute");
 const historyRoute = require("./historyRoute");
-
 const router = express.Router();
 
 const defaultRoutes = [
