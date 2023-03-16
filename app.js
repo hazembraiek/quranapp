@@ -41,9 +41,7 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     socket.to(roomId).emit("user-connected", userId);
   });
-  socket.on("disconnect", () => {
-    console.log("Socket disconnected:", socket.id);
-  });
+  socket.on("disconnect", () => {});
 });
 
 app.use(express.json());
