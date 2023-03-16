@@ -12,15 +12,28 @@ const sendAndCreateToken = (res, statusCode, user) => {
     ),
     httpOnly: true,
   };
-  res.cookie("jwt", token, cookieOption);
-
-  res.status(statusCode).json({
-    status: "success",
-    token,
-    data: {
-      user,
-    },
-  });
+  // res.header("Access-Control-Allow-Origin", "http://localhost:3000");
+  // res.header(
+  //   "Access-Control-Allow-Headers",
+  //   "Origin, X-Requested-With, Content-Type, Accept, Authorization,  X-PINGOTHER"
+  // );
+  // res.header("Access-Control-Allow-Credentials", true);
+  // res.header(
+  //   "Access-Control-Allow-Methods",
+  //   "GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS"
+  // );
+  res
+    .cookie("access_token", token, {
+      httpOnly: true,
+    })
+    .status(statusCode)
+    .json({
+      status: "success",
+      token,
+      data: {
+        user,
+      },
+    });
 };
 
 const asignToken = (id) => {
